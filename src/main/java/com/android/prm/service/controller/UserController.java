@@ -1,9 +1,6 @@
 package com.android.prm.service.controller;
 
-import com.android.prm.service.accountdto.EmployeeDTO;
-import com.android.prm.service.accountdto.TaskCreatedDTO;
-import com.android.prm.service.accountdto.UserDTO;
-import com.android.prm.service.accountdto.UserTaskIdSpinner;
+import com.android.prm.service.accountdto.*;
 import com.android.prm.service.mapper.UserMapper;
 import com.android.prm.service.model.request.AccountRequest;
 import com.android.prm.service.model.request.UserProfile;
@@ -42,6 +39,18 @@ public class UserController implements Serializable {
         return userMapper.loadUserProfileByUsername(node.get("username").asText());
     }
 
+    @PostMapping("/loadUserDetailFromAdmin")
+    public UserInfoAdminDTO loadUserDetailFromAdmin(@RequestBody String usernameJson){
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode node = null;
+        try {
+            node = objectMapper.readTree(usernameJson);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+        return userMapper.loadUserProfileByUsernameFromAdmin(node.get("username").asText());
+    }
+
     @PostMapping("/loadEmployeeByGroup")
     public List<UserDTO> loadUserByGroup(@RequestBody String usernameJson) {
         ObjectMapper objectMapper = new ObjectMapper();
@@ -51,6 +60,21 @@ public class UserController implements Serializable {
             node = objectMapper.readTree(usernameJson);
             UserDTO userDTO = userMapper.loadProfileUserWithGroupId(node.get("username").asText());
             listUser = userMapper.loadUserByGroupOfManager(userDTO.getGroupId());
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+        return listUser;
+    }
+
+    @PostMapping("/loadEmployeeByGroupAdmin")
+    public List<UserDTO> loadEmployeeByGroupAdmin(@RequestBody String usernameJson) {
+        ObjectMapper objectMapper = new ObjectMapper();
+        List<UserDTO> listUser = null;
+        JsonNode node = null;
+        try {
+            node = objectMapper.readTree(usernameJson);
+            UserDTO userDTO = userMapper.loadProfileUserWithGroupId(node.get("username").asText());
+            listUser = userMapper.loadUserByGroupOfManager(userDTO.getUsername());
         } catch (JsonProcessingException e) {
             e.printStackTrace();
         }
@@ -68,6 +92,19 @@ public class UserController implements Serializable {
             e.printStackTrace();
         }
         return userMapper.loadCurrentEmployeeOfGroup(node.get("username").asText());
+    }
+
+    @PostMapping("/currentEmployeeAdmin")
+    public List<EmployeeDTO> loadCurrentEmployeeByAdmin(@RequestBody String username) {
+        ObjectMapper objectMapper = new ObjectMapper();
+        List<UserDTO> listUser = null;
+        JsonNode node = null;
+        try {
+            node = objectMapper.readTree(username);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return userMapper.loadCurrentEmployeeByAdmin(node.get("username").asText());
     }
 
     @PostMapping("/loadEmployeeByGroupInAssigningTask")
@@ -89,5 +126,31 @@ public class UserController implements Serializable {
             e.printStackTrace();
         }
         return listUser;
+    }
+
+    @PostMapping("/deactiveUser")
+    public void deactiveUser(@RequestBody String username) {
+        ObjectMapper objectMapper = new ObjectMapper();
+        List<UserDTO> listUser = null;
+        JsonNode node = null;
+        try {
+            node = objectMapper.readTree(username);
+            userMapper.deactiveUser(node.get("username").asText());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @PostMapping("/activeUser")
+    public void activeUser(@RequestBody String username) {
+        ObjectMapper objectMapper = new ObjectMapper();
+        List<UserDTO> listUser = null;
+        JsonNode node = null;
+        try {
+            node = objectMapper.readTree(username);
+            userMapper.activeUser(node.get("username").asText());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 }

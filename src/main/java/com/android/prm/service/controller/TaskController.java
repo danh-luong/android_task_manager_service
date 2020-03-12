@@ -4,7 +4,6 @@ import com.android.prm.service.accountdto.*;
 import com.android.prm.service.mapper.TaskMapper;
 import com.android.prm.service.mapper.UserMapper;
 import com.android.prm.service.mapper.WorkFlowMapper;
-import com.android.prm.service.model.request.AccountRequest;
 import com.android.prm.service.model.request.UserProfile;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -14,7 +13,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import javax.validation.constraints.PastOrPresent;
 import java.io.Serializable;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -178,7 +176,7 @@ public class TaskController implements Serializable {
             java.sql.Date currentDateSQL = new java.sql.Date(Calendar.getInstance().getTimeInMillis());
             UserDTO userDTO = userMapper.loadUserManagerByEmployee(taskCreatedDTO.getUserAssignee());
             if (taskCreatedDTO.getUserCreationName() == null) {
-                taskMapper.insertNewTask(taskCreatedDTO.getName(), taskCreatedDTO.getDescriptionTask(), startDateSQL, endDateSQL, currentDateSQL, userDTO.getId(), taskCreatedDTO.getStatus());
+                taskMapper.insertNewTask(taskCreatedDTO.getName(), taskCreatedDTO.getDescriptionTask(), startDateSQL, endDateSQL, currentDateSQL, null, taskCreatedDTO.getStatus());
                 String currentTaskId = taskMapper.selectCurrentRecordTask();
                 workFlowMapper.createNewWorkFlowTaskFromTask(currentTaskId, currentDateSQL, taskCreatedDTO.getStatus());
                 String currentWorkFlowTaskId = workFlowMapper.getCurrentRecordWorkFlowTask();
@@ -193,8 +191,7 @@ public class TaskController implements Serializable {
                     int idOfAssignee = userMapper.loadIdOfUserByUsername(taskCreatedDTO.getUserAssignee());
                     workFlowMapper.insertUserTask(String.valueOf(idOfAssignee), currentWorkFlowTaskId);
                 } else {
-                    userDTO = userMapper.loadUserAdminByManager(taskCreatedDTO.getUserAssignee());
-                    taskMapper.insertNewTask(taskCreatedDTO.getName(), taskCreatedDTO.getDescriptionTask(), startDateSQL, endDateSQL, currentDateSQL, userDTO.getId(), taskCreatedDTO.getStatus());
+                    taskMapper.insertNewTask(taskCreatedDTO.getName(), taskCreatedDTO.getDescriptionTask(), startDateSQL, endDateSQL, currentDateSQL, null, taskCreatedDTO.getStatus());
                     String currentTaskId = taskMapper.selectCurrentRecordTask();
                     workFlowMapper.createNewWorkFlowTaskFromTask(currentTaskId, currentDateSQL, taskCreatedDTO.getStatus());
                     String currentWorkFlowTaskId = workFlowMapper.getCurrentRecordWorkFlowTask();
@@ -207,11 +204,32 @@ public class TaskController implements Serializable {
         }
     }
 
+    @PostMapping("/insertNewTaskAdmin")
+    public void insertNewTaskAdmin(@RequestBody TaskCreatedDTO taskCreatedDTO) {
+        try {
+            Date startDate = new SimpleDateFormat("dd-MM-yyyy").parse(taskCreatedDTO.getStartDate());
+            java.sql.Date startDateSQL = new java.sql.Date(startDate.getTime());
+            Date endDate = new SimpleDateFormat("dd-MM-yyyy").parse(taskCreatedDTO.getEndDate());
+            java.sql.Date endDateSQL = new java.sql.Date(endDate.getTime());
+            java.sql.Date currentDateSQL = new java.sql.Date(Calendar.getInstance().getTimeInMillis());
+            UserDTO userDTO = userMapper.loadIdOfAdmin(taskCreatedDTO.getUserCreationName());
+            taskMapper.insertNewTask(taskCreatedDTO.getName(), taskCreatedDTO.getDescriptionTask(), startDateSQL, endDateSQL, currentDateSQL, userDTO.getId(), "Doing");
+            String currentTaskId = taskMapper.selectCurrentRecordTask();
+            workFlowMapper.createNewWorkFlowTaskFromTask(currentTaskId, currentDateSQL, "Doing");
+            String currentWorkFlowTaskId = workFlowMapper.getCurrentRecordWorkFlowTask();
+            int idOfAssignee = userMapper.loadIdOfUserByUsername(taskCreatedDTO.getUserAssignee());
+            workFlowMapper.insertUserTask(String.valueOf(idOfAssignee), currentWorkFlowTaskId);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+    }
+
     @PostMapping("/currentTaskManager")
     public List<TaskDTO> getTaskListManager(@RequestBody String usernameJson) {
         List<Integer> listIdTask;
         List<TaskDTO> listTask = new ArrayList<>();
-        AccountRequest accountRequest;
+        UserProfile userProfile;
         TaskDTO taskDTO;
         int userId;
         ObjectMapper objectMapper = new ObjectMapper();
@@ -220,13 +238,13 @@ public class TaskController implements Serializable {
             node = objectMapper.readTree(usernameJson);
             userId = userMapper.loadIdOfUserByUsername(node.get("username").asText());
             listIdTask = taskMapper.loadTaskIdManager(userId);
-            accountRequest = userMapper.loadUserByUsername(node.get("username").asText());
+            userProfile = userMapper.loadUserProfileByUsername(node.get("username").asText());
             for (int i = 0; i < listIdTask.size(); i++) {
                 taskDTO = taskMapper.loadPendingTaskByIdForManager(listIdTask.get(i));
                 if (taskDTO == null) {
                     return new ArrayList<>();
                 }
-                taskDTO.setTxtAssignee(accountRequest.getUsername());
+                taskDTO.setTxtAssignee(userProfile.getName());
                 if (taskDTO.getStatus().equals("Doing")) {
                     listTask.add(taskDTO);
                 }
@@ -241,7 +259,7 @@ public class TaskController implements Serializable {
     public List<TaskDTO> getPendingListManager(@RequestBody String usernameJson) {
         List<Integer> listIdTask;
         List<TaskDTO> listTask = new ArrayList<>();
-        AccountRequest accountRequest;
+        UserProfile userProfile;
         TaskDTO taskDTO;
         int userId;
         ObjectMapper objectMapper = new ObjectMapper();
@@ -250,13 +268,13 @@ public class TaskController implements Serializable {
             node = objectMapper.readTree(usernameJson);
             userId = userMapper.loadIdOfUserByUsername(node.get("username").asText());
             listIdTask = taskMapper.loadTaskIdManager(userId);
-            accountRequest = userMapper.loadUserByUsername(node.get("username").asText());
+            userProfile = userMapper.loadUserProfileByUsername(node.get("username").asText());
             for (int i = 0; i < listIdTask.size(); i++) {
                 taskDTO = taskMapper.loadPendingTaskByIdForManager(listIdTask.get(i));
                 if (taskDTO == null) {
                     return new ArrayList<>();
                 }
-                taskDTO.setTxtAssignee(accountRequest.getUsername());
+                taskDTO.setTxtAssignee(userProfile.getName());
                 if (taskDTO.getStatus().equals("Pending")) {
                     listTask.add(taskDTO);
                 }
@@ -271,7 +289,7 @@ public class TaskController implements Serializable {
     public List<TaskDTO> getSuspendListManager(@RequestBody String usernameJson) {
         List<Integer> listIdTask;
         List<TaskDTO> listTask = new ArrayList<>();
-        AccountRequest accountRequest;
+        UserProfile userProfile;
         TaskDTO taskDTO;
         int userId;
         ObjectMapper objectMapper = new ObjectMapper();
@@ -280,13 +298,13 @@ public class TaskController implements Serializable {
             node = objectMapper.readTree(usernameJson);
             userId = userMapper.loadIdOfUserByUsername(node.get("username").asText());
             listIdTask = taskMapper.loadTaskIdManager(userId);
-            accountRequest = userMapper.loadUserByUsername(node.get("username").asText());
+            userProfile = userMapper.loadUserProfileByUsername(node.get("username").asText());
             for (int i = 0; i < listIdTask.size(); i++) {
                 taskDTO = taskMapper.loadPendingTaskByIdForManager(listIdTask.get(i));
                 if (taskDTO == null) {
                     return new ArrayList<>();
                 }
-                taskDTO.setTxtAssignee(accountRequest.getUsername());
+                taskDTO.setTxtAssignee(userProfile.getName());
                 if (taskDTO.getStatus().equals("Suspend")) {
                     listTask.add(taskDTO);
                 }
@@ -301,7 +319,7 @@ public class TaskController implements Serializable {
     public List<TaskDTO> getDeclineListManager(@RequestBody String usernameJson) {
         List<Integer> listIdTask;
         List<TaskDTO> listTask = new ArrayList<>();
-        AccountRequest accountRequest;
+        UserProfile userProfile;
         TaskDTO taskDTO;
         int userId;
         ObjectMapper objectMapper = new ObjectMapper();
@@ -310,13 +328,13 @@ public class TaskController implements Serializable {
             node = objectMapper.readTree(usernameJson);
             userId = userMapper.loadIdOfUserByUsername(node.get("username").asText());
             listIdTask = taskMapper.loadTaskIdManager(userId);
-            accountRequest = userMapper.loadUserByUsername(node.get("username").asText());
+            userProfile = userMapper.loadUserProfileByUsername(node.get("username").asText());
             for (int i = 0; i < listIdTask.size(); i++) {
                 taskDTO = taskMapper.loadPendingTaskByIdForManager(listIdTask.get(i));
                 if (taskDTO == null) {
                     return new ArrayList<>();
                 }
-                taskDTO.setTxtAssignee(accountRequest.getUsername());
+                taskDTO.setTxtAssignee(userProfile.getName());
                 if (taskDTO.getStatus().equals("Decline")) {
                     listTask.add(taskDTO);
                 }
@@ -331,7 +349,8 @@ public class TaskController implements Serializable {
     public void acceptTaskPending(@RequestBody AcceptDeclineDTO acceptDeclineDTO) {
         java.sql.Date currentDateSQL = new java.sql.Date(Calendar.getInstance().getTimeInMillis());
         int userWorkFlowId = workFlowMapper.selectUserIdThroughWorkFlow(acceptDeclineDTO.getTaskId());
-        taskMapper.updateTaskAccept(acceptDeclineDTO.getTaskId());
+        int userIdCreation = userMapper.loadIdOfUserByUsername(acceptDeclineDTO.getUserId());
+        taskMapper.updateTaskAccept(acceptDeclineDTO.getTaskId(), String.valueOf(userIdCreation));
         workFlowMapper.insertWorkFlowTaskAcceptOrDecline(acceptDeclineDTO.getTaskId(), currentDateSQL, "Doing");
         String currentWorkFlow = workFlowMapper.getCurrentRecordWorkFlowTask();
         workFlowMapper.insertUserTask(String.valueOf(userWorkFlowId), currentWorkFlow);
@@ -341,7 +360,8 @@ public class TaskController implements Serializable {
     public void declineTaskPending(@RequestBody AcceptDeclineDTO acceptDeclineDTO) {
         java.sql.Date currentDateSQL = new java.sql.Date(Calendar.getInstance().getTimeInMillis());
         int userWorkFlowId = workFlowMapper.selectUserIdThroughWorkFlow(acceptDeclineDTO.getTaskId());
-        taskMapper.updateTaskDecline(acceptDeclineDTO.getTaskId());
+        int userIdCreation = userMapper.loadIdOfUserByUsername(acceptDeclineDTO.getUserId());
+        taskMapper.updateTaskDecline(acceptDeclineDTO.getTaskId(), String.valueOf(userIdCreation));
         workFlowMapper.insertWorkFlowTaskAcceptOrDecline(acceptDeclineDTO.getTaskId(), currentDateSQL, "Decline");
         String currentWorkFlow = workFlowMapper.getCurrentRecordWorkFlowTask();
         workFlowMapper.insertUserTask(String.valueOf(userWorkFlowId), currentWorkFlow);
@@ -352,13 +372,20 @@ public class TaskController implements Serializable {
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode node = null;
         int currentIdUser = 0;
+        String groupId = null;
         try {
             node = objectMapper.readTree(username);
             currentIdUser = userMapper.loadIdOfUserByUsername(node.get("username").asText());
+            groupId = userMapper.loadGroupIdByUserName(String.valueOf(currentIdUser));
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return taskMapper.loadPendingTask(String.valueOf(currentIdUser));
+        return taskMapper.loadPendingTask(String.valueOf(currentIdUser), groupId);
+    }
+
+    @PostMapping("/pendingTaskEmployeeInAdmin")
+    public List<TaskDTO> loadPendingTaskEmployeeInAdmin() {
+        return taskMapper.loadPendingTaskByAdmin();
     }
 
     @PostMapping("/updateTask")

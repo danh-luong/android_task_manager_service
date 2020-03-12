@@ -20,7 +20,7 @@ public interface TaskMapper {
     public List<Integer> loadTaskId(int userId);
 
     @Select("select top 1 i.txtTaskId, i.txtTaskName, i.txtAssignDate, i.txtStartDate, i.txtEndDate, i.status from UserTask u right join (select w.id as workflowId, t.id as txtTaskId, t.name as txtTaskName, w.assignTaskDate as txtAssignDate, t.startDate as txtStartDate,\n" +
-            "t.endDate as txtEndDate, w.status as status from WorkFlowTask w left join Task t on w.taskId = t.id where t.id = #{taskId}) i\n" +
+            "t.endDate as txtEndDate, t.status as status from WorkFlowTask w left join Task t on w.taskId = t.id where t.id = #{taskId}) i\n" +
             "on u.workflowTaskId = i.workflowId where u.userSolutionId = #{userId} order by i.workflowId desc")
     public TaskDTO loadTaskById(int taskId, String userId);
 
@@ -55,17 +55,25 @@ public interface TaskMapper {
             "where userSolutionId = #{userId}) x on x.workflowTaskId = t.id")
     public List<Integer> loadTaskIdManager(int userId);
 
-    @Update("update Task set Task.status = 'Doing' where Task.id = #{taskId}")
-    public void updateTaskAccept(String taskId);
+    @Update("update Task set Task.status = 'Doing', Task.userCreationId = #{userId} where Task.id = #{taskId}")
+    public void updateTaskAccept(String taskId, String userId);
 
-    @Update("update Task set Task.status = 'Decline' where Task.id = #{taskId}")
-    public void updateTaskDecline(String taskId);
+    @Update("update Task set Task.status = 'Decline', Task.userCreationId = #{userId} where Task.id = #{taskId}")
+    public void updateTaskDecline(String taskId, String userId);
 
     @Select("select p.txtTaskId, p.txtTaskName, p.txtAssignDate, p.txtStartDate, p.txtEndDate, a.name as txtAssignee from \n" +
-            "(select y.txtTaskId, y.txtTaskName, y.txtAssignDate, y.txtStartDate, y.txtEndDate, z.userSolutionId as userId from (select w.id as workflowTaskId, t.id as txtTaskId, t.name as txtTaskName, w.assignTaskDate as txtAssignDate, t.startDate as txtStartDate,\n" +
-            "t.endDate as txtEndDate from WorkFlowTask w left join Task t on w.taskId = t.id where t.status = 'Pending' and t.userCreationId = #{userId}) y\n" +
+            "(select z.userSolutionId, y.txtTaskId, y.txtTaskName, y.txtAssignDate, y.txtStartDate, y.txtEndDate, z.userSolutionId as userId from (select w.id as workflowTaskId, t.id as txtTaskId, t.name as txtTaskName, w.assignTaskDate as txtAssignDate, t.startDate as txtStartDate,\n" +
+            "t.endDate as txtEndDate from WorkFlowTask w left join Task t on w.taskId = t.id where t.status = 'Pending') y\n" +
+            "left join UserTask z on y.workflowTaskId = z.workflowTaskId) p left join Account a on p.userId = a.id where p.userSolutionId != #{userId} and a.groupId = #{groupId}")
+    public List<TaskDTO> loadPendingTask(String userId, String groupId);
+
+
+    @Select("select p.txtTaskId, p.txtTaskName, p.txtAssignDate, p.txtStartDate, p.txtEndDate, a.name as txtAssignee from\n" +
+            "(select z.userSolutionId, y.txtTaskId, y.txtTaskName, y.txtAssignDate, y.txtStartDate, y.txtEndDate, z.userSolutionId as \n" +
+            "userId from (select w.id as workflowTaskId, t.id as txtTaskId, t.name as txtTaskName, w.assignTaskDate as txtAssignDate, t.startDate as txtStartDate,\n" +
+            "t.endDate as txtEndDate from WorkFlowTask w left join Task t on w.taskId = t.id where t.status = 'Pending') y\n" +
             "left join UserTask z on y.workflowTaskId = z.workflowTaskId) p left join Account a on p.userId = a.id")
-    public List<TaskDTO> loadPendingTask(String userId);
+    public List<TaskDTO> loadPendingTaskByAdmin();
 
     @Update("update Task set name = #{taskName}, descsriptionTask = #{descriptionTask}," +
             " endDate = #{endDate} where id = #{taskId}")
