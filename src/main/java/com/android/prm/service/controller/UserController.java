@@ -2,9 +2,7 @@ package com.android.prm.service.controller;
 
 import com.android.prm.service.accountdto.*;
 import com.android.prm.service.mapper.UserMapper;
-import com.android.prm.service.model.request.AccountRequest;
 import com.android.prm.service.model.request.UserProfile;
-import com.android.prm.service.model.response.AccountResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 
 @RestController
@@ -113,7 +112,12 @@ public class UserController implements Serializable {
         List<UserDTO> listUser = new ArrayList<>();
         try {
             UserDTO userDTO = userMapper.loadProfileUserWithGroupId(userTaskIdSpinner.getUsername());
-            templistUser = userMapper.loadUserByGroupOfManager(userDTO.getGroupId());
+            if (!userDTO.getRoleId().equals("1")) {
+                templistUser = userMapper.loadUserByGroupOfManager(userDTO.getGroupId());
+            } else {
+                String groupId = userMapper.selectGroupIdFromTaskId(userTaskIdSpinner.getTaskId());
+                templistUser = userMapper.loadUserByGroupOfAdmin(userTaskIdSpinner.getUsername(), groupId);
+            }
             int id = userMapper.getIdOfUserDoingCurrentTaskWithTaskId(userTaskIdSpinner.getTaskId());
             for (int i = 0; i < templistUser.size(); i++) {
                 if (Integer.parseInt(templistUser.get(i).getId()) != id && !templistUser.get(i).getUsername().equals(userTaskIdSpinner.getUsername())) {
@@ -152,5 +156,14 @@ public class UserController implements Serializable {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    @PostMapping("/updateUserInfo")
+    public void updateUserInfo(@RequestBody UpdatedUserInfoDTO updatedUserInfoDTO) {
+        userMapper.updateUserInfo(updatedUserInfoDTO.getName(), updatedUserInfoDTO.getPhone(), updatedUserInfoDTO.getEmail(),
+                updatedUserInfoDTO.getAddress(), updatedUserInfoDTO.getId());
+        int userUpdateId = userMapper.loadIdOfUserByUsername(updatedUserInfoDTO.getUserUpdated());
+        java.sql.Date currentDateSQL = new java.sql.Date(Calendar.getInstance().getTimeInMillis());
+        userMapper.insertUpdateDetail(updatedUserInfoDTO.getId(), String.valueOf(userUpdateId), currentDateSQL);
     }
 }

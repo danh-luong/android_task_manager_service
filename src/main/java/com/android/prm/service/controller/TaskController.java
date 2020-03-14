@@ -162,7 +162,6 @@ public class TaskController implements Serializable {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        Collections.reverse(historyTaskDTOList);
         return historyTaskDTOList;
     }
 
@@ -178,25 +177,19 @@ public class TaskController implements Serializable {
             if (taskCreatedDTO.getUserCreationName() == null) {
                 taskMapper.insertNewTask(taskCreatedDTO.getName(), taskCreatedDTO.getDescriptionTask(), startDateSQL, endDateSQL, currentDateSQL, null, taskCreatedDTO.getStatus());
                 String currentTaskId = taskMapper.selectCurrentRecordTask();
-                workFlowMapper.createNewWorkFlowTaskFromTask(currentTaskId, currentDateSQL, taskCreatedDTO.getStatus());
-                String currentWorkFlowTaskId = workFlowMapper.getCurrentRecordWorkFlowTask();
                 int idOfAssignee = userMapper.loadIdOfUserByUsername(taskCreatedDTO.getUserAssignee());
-                workFlowMapper.insertUserTask(String.valueOf(idOfAssignee), currentWorkFlowTaskId);
+                workFlowMapper.createNewWorkFlowTaskFromTask(currentTaskId, currentDateSQL, taskCreatedDTO.getStatus(), String.valueOf(idOfAssignee));
             } else {
                 if (!taskCreatedDTO.getUserCreationName().equals(taskCreatedDTO.getUserAssignee())) {
                     taskMapper.insertNewTask(taskCreatedDTO.getName(), taskCreatedDTO.getDescriptionTask(), startDateSQL, endDateSQL, currentDateSQL, userDTO.getId(), "Doing");
                     String currentTaskId = taskMapper.selectCurrentRecordTask();
-                    workFlowMapper.createNewWorkFlowTaskFromTask(currentTaskId, currentDateSQL, "Doing");
-                    String currentWorkFlowTaskId = workFlowMapper.getCurrentRecordWorkFlowTask();
                     int idOfAssignee = userMapper.loadIdOfUserByUsername(taskCreatedDTO.getUserAssignee());
-                    workFlowMapper.insertUserTask(String.valueOf(idOfAssignee), currentWorkFlowTaskId);
+                    workFlowMapper.createNewWorkFlowTaskFromTask(currentTaskId, currentDateSQL, "Doing", String.valueOf(idOfAssignee));
                 } else {
                     taskMapper.insertNewTask(taskCreatedDTO.getName(), taskCreatedDTO.getDescriptionTask(), startDateSQL, endDateSQL, currentDateSQL, null, taskCreatedDTO.getStatus());
                     String currentTaskId = taskMapper.selectCurrentRecordTask();
-                    workFlowMapper.createNewWorkFlowTaskFromTask(currentTaskId, currentDateSQL, taskCreatedDTO.getStatus());
-                    String currentWorkFlowTaskId = workFlowMapper.getCurrentRecordWorkFlowTask();
                     int idOfAssignee = userMapper.loadIdOfUserByUsername(taskCreatedDTO.getUserAssignee());
-                    workFlowMapper.insertUserTask(String.valueOf(idOfAssignee), currentWorkFlowTaskId);
+                    workFlowMapper.createNewWorkFlowTaskFromTask(currentTaskId, currentDateSQL, taskCreatedDTO.getStatus(), String.valueOf(idOfAssignee));
                 }
             }
         } catch (Exception e) {
@@ -215,10 +208,8 @@ public class TaskController implements Serializable {
             UserDTO userDTO = userMapper.loadIdOfAdmin(taskCreatedDTO.getUserCreationName());
             taskMapper.insertNewTask(taskCreatedDTO.getName(), taskCreatedDTO.getDescriptionTask(), startDateSQL, endDateSQL, currentDateSQL, userDTO.getId(), "Doing");
             String currentTaskId = taskMapper.selectCurrentRecordTask();
-            workFlowMapper.createNewWorkFlowTaskFromTask(currentTaskId, currentDateSQL, "Doing");
-            String currentWorkFlowTaskId = workFlowMapper.getCurrentRecordWorkFlowTask();
             int idOfAssignee = userMapper.loadIdOfUserByUsername(taskCreatedDTO.getUserAssignee());
-            workFlowMapper.insertUserTask(String.valueOf(idOfAssignee), currentWorkFlowTaskId);
+            workFlowMapper.createNewWorkFlowTaskFromTask(currentTaskId, currentDateSQL, "Doing", String.valueOf(idOfAssignee));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -240,7 +231,7 @@ public class TaskController implements Serializable {
             listIdTask = taskMapper.loadTaskIdManager(userId);
             userProfile = userMapper.loadUserProfileByUsername(node.get("username").asText());
             for (int i = 0; i < listIdTask.size(); i++) {
-                taskDTO = taskMapper.loadPendingTaskByIdForManager(listIdTask.get(i));
+                taskDTO = taskMapper.loadTaskByIdForManager(listIdTask.get(i), userId);
                 if (taskDTO == null) {
                     return new ArrayList<>();
                 }
@@ -351,9 +342,7 @@ public class TaskController implements Serializable {
         int userWorkFlowId = workFlowMapper.selectUserIdThroughWorkFlow(acceptDeclineDTO.getTaskId());
         int userIdCreation = userMapper.loadIdOfUserByUsername(acceptDeclineDTO.getUserId());
         taskMapper.updateTaskAccept(acceptDeclineDTO.getTaskId(), String.valueOf(userIdCreation));
-        workFlowMapper.insertWorkFlowTaskAcceptOrDecline(acceptDeclineDTO.getTaskId(), currentDateSQL, "Doing");
-        String currentWorkFlow = workFlowMapper.getCurrentRecordWorkFlowTask();
-        workFlowMapper.insertUserTask(String.valueOf(userWorkFlowId), currentWorkFlow);
+        workFlowMapper.insertWorkFlowTaskAcceptOrDecline(acceptDeclineDTO.getTaskId(), currentDateSQL, "Doing", String.valueOf(userWorkFlowId));
     }
 
     @PostMapping("/declineTask")
@@ -362,9 +351,7 @@ public class TaskController implements Serializable {
         int userWorkFlowId = workFlowMapper.selectUserIdThroughWorkFlow(acceptDeclineDTO.getTaskId());
         int userIdCreation = userMapper.loadIdOfUserByUsername(acceptDeclineDTO.getUserId());
         taskMapper.updateTaskDecline(acceptDeclineDTO.getTaskId(), String.valueOf(userIdCreation));
-        workFlowMapper.insertWorkFlowTaskAcceptOrDecline(acceptDeclineDTO.getTaskId(), currentDateSQL, "Decline");
-        String currentWorkFlow = workFlowMapper.getCurrentRecordWorkFlowTask();
-        workFlowMapper.insertUserTask(String.valueOf(userWorkFlowId), currentWorkFlow);
+        workFlowMapper.insertWorkFlowTaskAcceptOrDecline(acceptDeclineDTO.getTaskId(), currentDateSQL, "Decline", String.valueOf(userWorkFlowId));
     }
 
     @PostMapping("/pendingTask")
@@ -376,7 +363,7 @@ public class TaskController implements Serializable {
         try {
             node = objectMapper.readTree(username);
             currentIdUser = userMapper.loadIdOfUserByUsername(node.get("username").asText());
-            groupId = userMapper.loadGroupIdByUserName(String.valueOf(currentIdUser));
+            groupId = userMapper.loadGroupIdByUserName(node.get("username").asText());
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -432,9 +419,7 @@ public class TaskController implements Serializable {
             int currentWorkFlow = workFlowMapper.getCurrentWorkFlowOfTask(userTaskIdSpinner.getTaskId());
             java.sql.Date currentDateSQL = new java.sql.Date(Calendar.getInstance().getTimeInMillis());
             workFlowMapper.updateTaskNotDoneForCurrentUserDoing(String.valueOf(currentWorkFlow), currentDateSQL);
-            workFlowMapper.insertNewWorkFlowTaskForNewEmployee(userTaskIdSpinner.getTaskId(), currentDateSQL, "Doing");
-            String taskId = workFlowMapper.getCurrentRecordWorkFlowTask();
-            workFlowMapper.insertUserTask(newUserIdTask, taskId);
+            workFlowMapper.insertNewWorkFlowTaskForNewEmployee(userTaskIdSpinner.getTaskId(), currentDateSQL, "Doing", String.valueOf(newUserIdTask));
         } catch (Exception e) {
             e.printStackTrace();
         }
