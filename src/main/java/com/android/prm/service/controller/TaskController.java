@@ -424,4 +424,103 @@ public class TaskController implements Serializable {
             e.printStackTrace();
         }
     }
+
+    @PostMapping("/submitTask")
+    public void submitTask(@RequestBody InsertNewTaskDTO insertNewTaskDTO) {
+        try {
+            int userSubmitTask = userMapper.loadIdOfUserByUsername(insertNewTaskDTO.getUsername());
+            java.sql.Date currentDateSQL = new java.sql.Date(Calendar.getInstance().getTimeInMillis());
+            taskMapper.submitTask(insertNewTaskDTO.getTaskId());
+            workFlowMapper.insertSubmitTask(insertNewTaskDTO.getTaskId(), currentDateSQL, "Waiting", String.valueOf(userSubmitTask));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @PostMapping("/waitingTask")
+    public List<TaskDTO> getWaitingTask(@RequestBody String username) {
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode node = null;
+        int currentIdUser = 0;
+        String groupId = null;
+        try {
+            node = objectMapper.readTree(username);
+            currentIdUser = userMapper.loadIdOfUserByUsername(node.get("username").asText());
+            groupId = userMapper.loadGroupIdByUserName(node.get("username").asText());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return taskMapper.loadWaitingTask(String.valueOf(currentIdUser), groupId);
+    }
+
+    @PostMapping("/finishTask")
+    public void finishTask(@RequestBody TaskAcceptDeclineDTO taskAcceptDeclineDTO) {
+        taskMapper.finishTask(taskAcceptDeclineDTO.getTaskId());
+        TaskForDoneDTO taskForDoneDTO = taskMapper.getTaskForDone(taskAcceptDeclineDTO.getTaskId());
+        try {
+            Date assignTaskDate = new SimpleDateFormat("dd-MM-yyyy").parse(taskForDoneDTO.getAssignTaskDate());
+            java.sql.Date assignTaskDateSQL = new java.sql.Date(assignTaskDate.getTime());
+            java.sql.Date currentDateSQL = new java.sql.Date(Calendar.getInstance().getTimeInMillis());
+            workFlowMapper.insertTaskDone(taskAcceptDeclineDTO.getTaskId(), assignTaskDateSQL, "Done",
+                    taskForDoneDTO.getUserSolutionId(), taskAcceptDeclineDTO.getFeedback(), taskAcceptDeclineDTO.getRate(), currentDateSQL);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @PostMapping("/declineSubmitTask")
+    public void declineTask(@RequestBody TaskAcceptDeclineDTO taskAcceptDeclineDTO) {
+        taskMapper.finishTask(taskAcceptDeclineDTO.getTaskId());
+        TaskForDoneDTO taskForDoneDTO = taskMapper.getTaskForDone(taskAcceptDeclineDTO.getTaskId());
+        try {
+            Date assignTaskDate = new SimpleDateFormat("dd-MM-yyyy").parse(taskForDoneDTO.getAssignTaskDate());
+            java.sql.Date assignTaskDateSQL = new java.sql.Date(assignTaskDate.getTime());
+            java.sql.Date currentDateSQL = new java.sql.Date(Calendar.getInstance().getTimeInMillis());
+            workFlowMapper.insertTaskDone(taskAcceptDeclineDTO.getTaskId(), assignTaskDateSQL, "Not Done",
+                    taskForDoneDTO.getUserSolutionId(), taskAcceptDeclineDTO.getFeedback(), taskAcceptDeclineDTO.getRate(), currentDateSQL);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @PostMapping("/reviewedTask")
+    public List<TaskDTO> getReviewedTask(@RequestBody String usernameJson) {
+        List<Integer> listIdTask;
+        List<TaskDTO> listTask = new ArrayList<>();
+        UserProfile userProfile;
+        TaskDTO taskDTO;
+        int userId;
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode node = null;
+        try {
+            node = objectMapper.readTree(usernameJson);
+            userId = userMapper.loadIdOfUserByUsername(node.get("username").asText());
+            listIdTask = taskMapper.loadTaskId(userId);
+            userProfile = userMapper.loadUserProfileByUsername(node.get("username").asText());
+            for (int i = 0; i < listIdTask.size(); i++) {
+                taskDTO = taskMapper.loadTaskById(listIdTask.get(i), String.valueOf(userId));
+                taskDTO.setTxtAssignee(userProfile.getName());
+                if (taskDTO.getStatus().equals("Done") || taskDTO.getStatus().equals("Not Done")) {
+                    listTask.add(taskDTO);
+                }
+            }
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+        return listTask;
+    }
+
+    @PostMapping("/reviewTask")
+    public ReviewDTO getReviewTask(@RequestBody String taskId) {
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode node = null;
+        ReviewDTO reviewDTO = null;
+        try {
+            node = objectMapper.readTree(taskId);
+            reviewDTO = workFlowMapper.getReviewedTask(node.get("taskId").asText());
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+        return reviewDTO;
+    }
 }

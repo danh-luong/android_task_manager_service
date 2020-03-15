@@ -1,5 +1,6 @@
 package com.android.prm.service.mapper;
 
+import com.android.prm.service.accountdto.ReviewDTO;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
@@ -36,4 +37,14 @@ public interface WorkFlowMapper {
 
     @Insert("insert into WorkFlowTask(taskId, assignTaskDate, status, userSolutionId) values (#{taskId}, #{assignDate}, #{status}, #{assignedUser})")
     public void insertNewWorkFlowTaskForNewEmployee(String taskId, Date assignDate, String status, String assignedUser);
+
+    @Insert("insert into WorkFlowTask(taskId, assignTaskDate, status, userSolutionId) values (#{taskId}, #{assignDate}, #{status}, #{assignedUser})")
+    public void insertSubmitTask(String taskId, Date assignDate, String status, String assignedUser);
+
+    @Insert("insert into WorkFlowTask(taskId, assignTaskDate, status, userSolutionId, feedback, rate, createdFeedbackDate) " +
+            "values (#{taskId}, #{assignDate}, #{status}, #{assignedUser}, #{feedback}, #{rate}, #{createdFeedbackDate})")
+    public void insertTaskDone(String taskId, Date assignDate, String status, String assignedUser, String feedback, String rate, Date createdFeedbackDate);
+
+    @Select("select top 1 feedback, rate, createdFeedbackDate as createdFeedback, status as summary from WorkFlowTask where taskId = #{taskId} order by id desc")
+    public ReviewDTO getReviewedTask(String taskId);
 }

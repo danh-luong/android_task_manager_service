@@ -2,6 +2,7 @@ package com.android.prm.service.mapper;
 import com.android.prm.service.accountdto.HistoryTaskDTO;
 import com.android.prm.service.accountdto.TaskDTO;
 import com.android.prm.service.accountdto.TaskDetailDTO;
+import com.android.prm.service.accountdto.TaskForDoneDTO;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
@@ -66,6 +67,12 @@ public interface TaskMapper {
             " p left join Account a on p.userSolutionId = a.id where p.userSolutionId != #{userId} and a.groupId = #{groupId}")
     public List<TaskDTO> loadPendingTask(String userId, String groupId);
 
+    @Select("select top 1 p.txtTaskId, p.txtTaskName, p.txtAssignDate, p.txtStartDate, p.txtEndDate, a.name as txtAssignee from \n" +
+            "(select t.id as txtTaskId, t.name as txtTaskName, w.assignTaskDate as txtAssignDate, t.startDate as txtStartDate,\n" +
+            "t.endDate as txtEndDate, w.userSolutionId from WorkFlowTask w left join Task t on w.taskId = t.id where t.status = 'Waiting')\n" +
+            "p left join Account a on p.userSolutionId = a.id where p.userSolutionId != #{userId} and a.groupId = #{groupId}")
+    public List<TaskDTO> loadWaitingTask(String userId, String groupId);
+
     @Select("select p.txtTaskId, p.txtTaskName, p.txtAssignDate, p.txtStartDate, p.txtEndDate, a.name as txtAssignee from\n" +
             "(select w.id as workflowTaskId, t.id as txtTaskId, t.name as txtTaskName, w.assignTaskDate as txtAssignDate, t.startDate as txtStartDate,\n" +
             "t.endDate as txtEndDate, w.userSolutionId from WorkFlowTask w left join Task t on w.taskId = t.id where t.status = 'Pending') p left join Account a on p.userSolutionId = a.id")
@@ -81,4 +88,13 @@ public interface TaskMapper {
     @Update("update Task set name = #{taskName}, descsriptionTask = #{descriptionTask}," +
             " startDate = #{startDate}, endDate = #{endDate} where id = #{taskId}")
     public void updatePendingTask(String taskName, String descriptionTask, Date startDate, Date endDate, String taskId);
+
+    @Update("Update Task set status = 'Waiting' where id = #{taskId}")
+    public void submitTask(String taskId);
+
+    @Update("Update Task set status = 'Done' where id = #{taskId}")
+    public void finishTask(String taskId);
+
+    @Select("select top 1 w.assignTaskDate, w.userSolutionId from WorkFlowTask w where taskId = #{taskId} order by id desc")
+    public TaskForDoneDTO getTaskForDone(String taskId);
 }
