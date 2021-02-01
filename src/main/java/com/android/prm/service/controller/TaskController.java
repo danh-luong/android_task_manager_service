@@ -4,6 +4,7 @@ import com.android.prm.service.accountdto.*;
 import com.android.prm.service.mapper.TaskMapper;
 import com.android.prm.service.mapper.UserMapper;
 import com.android.prm.service.mapper.WorkFlowMapper;
+import com.android.prm.service.model.request.AccountRequest;
 import com.android.prm.service.model.request.UserProfile;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -159,6 +160,12 @@ public class TaskController implements Serializable {
         try {
             node = objectMapper.readTree(taskIdJson);
             historyTaskDTOList = taskMapper.loadHistoryOfTask(node.get("taskId").asInt());
+            for (int i = 0; i < historyTaskDTOList.size(); i++) {
+                if (historyTaskDTOList.get(i).getTxtSuspendBy() != null) {
+                    String userSuspendName = userMapper.getUserNameById(historyTaskDTOList.get(i).getTxtSuspendBy());
+                    historyTaskDTOList.get(i).setTxtSuspendBy(userSuspendName);
+                }
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -387,12 +394,16 @@ public class TaskController implements Serializable {
     }
 
     @PostMapping("/suspendTask")
-    public void updateTask(@RequestBody String taskId) {
+    public void updateTask(@RequestBody SuspendDTO suspendDTO) {
         try {
-            ObjectMapper objectMapper = new ObjectMapper();
-            JsonNode node = null;
-            node = objectMapper.readTree(taskId);
-            taskMapper.suspendTask(node.get("taskId").asText());
+            taskMapper.suspendTask(suspendDTO.getTaskId());
+            int userSuspendId = userMapper.loadIdOfUserByUsername(suspendDTO.getUserName());
+            WorkFlowTaskDTO workFlowTaskDTO = workFlowMapper.getCurrentWorkFlowTaskByTaskId(suspendDTO.getTaskId());
+            Date assignDate = new SimpleDateFormat("yyyy-MM-dd").parse(workFlowTaskDTO.getAssignTaskDate());
+            java.sql.Date assignDateSQL = new java.sql.Date(assignDate.getTime());
+            java.sql.Date currentDateSQL = new java.sql.Date(Calendar.getInstance().getTimeInMillis());
+            workFlowMapper.insertWorkFlowSuspendTask(suspendDTO.getTaskId(), assignDateSQL, "Suspend", workFlowTaskDTO.getUserSolutionId(),
+                    currentDateSQL, String.valueOf(userSuspendId));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -429,9 +440,12 @@ public class TaskController implements Serializable {
     public void submitTask(@RequestBody InsertNewTaskDTO insertNewTaskDTO) {
         try {
             int userSubmitTask = userMapper.loadIdOfUserByUsername(insertNewTaskDTO.getUsername());
-            java.sql.Date currentDateSQL = new java.sql.Date(Calendar.getInstance().getTimeInMillis());
             taskMapper.submitTask(insertNewTaskDTO.getTaskId());
-            workFlowMapper.insertSubmitTask(insertNewTaskDTO.getTaskId(), currentDateSQL, "Waiting", String.valueOf(userSubmitTask));
+            int userId = userMapper.loadIdOfUserByUsername(insertNewTaskDTO.getUsername());
+            TaskDTO taskDTO = taskMapper.loadTaskById(Integer.parseInt(insertNewTaskDTO.getTaskId()), String.valueOf(userId));
+            Date assignDate = new SimpleDateFormat("yyyy-MM-dd").parse(taskDTO.getTxtAssignDate());
+            java.sql.Date assignDateSQL = new java.sql.Date(assignDate.getTime());
+            workFlowMapper.insertSubmitTask(insertNewTaskDTO.getTaskId(), assignDateSQL, "Waiting", String.valueOf(userSubmitTask));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -453,16 +467,32 @@ public class TaskController implements Serializable {
         return taskMapper.loadWaitingTask(String.valueOf(currentIdUser), groupId);
     }
 
+    @PostMapping("/waitingTaskAdmin")
+    public List<TaskDTO> getWaitingTaskAdmin(@RequestBody String username) {
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode node = null;
+        int currentIdUser = 0;
+        String groupId = null;
+        try {
+            node = objectMapper.readTree(username);
+            currentIdUser = userMapper.loadIdOfUserByUsername(node.get("username").asText());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return taskMapper.loadWaitingTaskByAdmin(String.valueOf(currentIdUser));
+    }
+
     @PostMapping("/finishTask")
     public void finishTask(@RequestBody TaskAcceptDeclineDTO taskAcceptDeclineDTO) {
         taskMapper.finishTask(taskAcceptDeclineDTO.getTaskId());
         TaskForDoneDTO taskForDoneDTO = taskMapper.getTaskForDone(taskAcceptDeclineDTO.getTaskId());
         try {
-            Date assignTaskDate = new SimpleDateFormat("dd-MM-yyyy").parse(taskForDoneDTO.getAssignTaskDate());
+            Date assignTaskDate = new SimpleDateFormat("yyyy-MM-dd").parse(taskForDoneDTO.getAssignTaskDate());
             java.sql.Date assignTaskDateSQL = new java.sql.Date(assignTaskDate.getTime());
             java.sql.Date currentDateSQL = new java.sql.Date(Calendar.getInstance().getTimeInMillis());
             workFlowMapper.insertTaskDone(taskAcceptDeclineDTO.getTaskId(), assignTaskDateSQL, "Done",
                     taskForDoneDTO.getUserSolutionId(), taskAcceptDeclineDTO.getFeedback(), taskAcceptDeclineDTO.getRate(), currentDateSQL);
+            taskMapper.updateTaskInSubmit("Done", taskAcceptDeclineDTO.getTaskId());
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -476,8 +506,9 @@ public class TaskController implements Serializable {
             Date assignTaskDate = new SimpleDateFormat("dd-MM-yyyy").parse(taskForDoneDTO.getAssignTaskDate());
             java.sql.Date assignTaskDateSQL = new java.sql.Date(assignTaskDate.getTime());
             java.sql.Date currentDateSQL = new java.sql.Date(Calendar.getInstance().getTimeInMillis());
-            workFlowMapper.insertTaskDone(taskAcceptDeclineDTO.getTaskId(), assignTaskDateSQL, "Not Done",
+            workFlowMapper.insertTaskDone(taskAcceptDeclineDTO.getTaskId(), assignTaskDateSQL, "Doing",
                     taskForDoneDTO.getUserSolutionId(), taskAcceptDeclineDTO.getFeedback(), taskAcceptDeclineDTO.getRate(), currentDateSQL);
+            taskMapper.updateTaskInSubmit("Doing", taskAcceptDeclineDTO.getTaskId());
         } catch (Exception e) {
             e.printStackTrace();
         }

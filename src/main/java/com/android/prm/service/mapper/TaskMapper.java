@@ -1,8 +1,5 @@
 package com.android.prm.service.mapper;
-import com.android.prm.service.accountdto.HistoryTaskDTO;
-import com.android.prm.service.accountdto.TaskDTO;
-import com.android.prm.service.accountdto.TaskDetailDTO;
-import com.android.prm.service.accountdto.TaskForDoneDTO;
+import com.android.prm.service.accountdto.*;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
@@ -29,9 +26,9 @@ public interface TaskMapper {
             "on t.userCreationId = a.id where t.id = #{taskId}")
     public TaskDetailDTO loadTaskDetailById(int taskId);
 
-    @Select("select t.name as txtTaskName, y.assignTaskDate as txtAssignDate, y.status as txtStatus, y.name as txtAssignee from\n" +
-            "(select w.id, w.status, w.assignTaskDate ,w.taskId, w.id as workflowTaskId, a.name from WorkFlowTask w left join Account a on w.userSolutionId = a.id\n" +
-            " where w.taskId = #{taskId}) y left join Task t on y.taskId = t.id order by y.id desc")
+    @Select("select t.name as txtTaskName, y.assignTaskDate as txtAssignDate, y.status as txtStatus, y.name as txtAssignee, y.suspendDate as txtSupendDate, y.userSuspendId as txtSuspendBy from\n" +
+            "(select w.id, w.status, w.assignTaskDate ,w.taskId, w.id as workflowTaskId, a.name, w.suspendDate, w.userSuspendId from WorkFlowTask w left join Account a \n" +
+            "on w.userSolutionId = a.id where w.taskId = #{taskId}) y left join Task t on y.taskId = t.id order by y.id desc")
     public List<HistoryTaskDTO> loadHistoryOfTask(int taskId);
 
     @Insert("insert into Task(name, descsriptionTask, startDate, endDate, createdDate, userCreationId, status) " +
@@ -67,11 +64,17 @@ public interface TaskMapper {
             " p left join Account a on p.userSolutionId = a.id where p.userSolutionId != #{userId} and a.groupId = #{groupId}")
     public List<TaskDTO> loadPendingTask(String userId, String groupId);
 
-    @Select("select top 1 p.txtTaskId, p.txtTaskName, p.txtAssignDate, p.txtStartDate, p.txtEndDate, a.name as txtAssignee from \n" +
+    @Select("select distinct p.txtTaskId, p.txtTaskName, p.txtAssignDate, p.txtStartDate, p.txtEndDate, a.name as txtAssignee from \n" +
             "(select t.id as txtTaskId, t.name as txtTaskName, w.assignTaskDate as txtAssignDate, t.startDate as txtStartDate,\n" +
             "t.endDate as txtEndDate, w.userSolutionId from WorkFlowTask w left join Task t on w.taskId = t.id where t.status = 'Waiting')\n" +
             "p left join Account a on p.userSolutionId = a.id where p.userSolutionId != #{userId} and a.groupId = #{groupId}")
     public List<TaskDTO> loadWaitingTask(String userId, String groupId);
+
+    @Select("select top 1 p.txtTaskId, p.txtTaskName, p.txtAssignDate, p.txtStartDate, p.txtEndDate, a.name as txtAssignee from \n" +
+            "(select t.id as txtTaskId, t.name as txtTaskName, w.assignTaskDate as txtAssignDate, t.startDate as txtStartDate,\n" +
+            "t.endDate as txtEndDate, w.userSolutionId, w.id from WorkFlowTask w left join Task t on t.id = w.taskId where t.status = 'Waiting')\n" +
+            "p left join Account a on p.userSolutionId = a.id where p.userSolutionId != #{userId} order by p.id")
+    public List<TaskDTO> loadWaitingTaskByAdmin(String userId);
 
     @Select("select p.txtTaskId, p.txtTaskName, p.txtAssignDate, p.txtStartDate, p.txtEndDate, a.name as txtAssignee from\n" +
             "(select w.id as workflowTaskId, t.id as txtTaskId, t.name as txtTaskName, w.assignTaskDate as txtAssignDate, t.startDate as txtStartDate,\n" +
@@ -97,4 +100,12 @@ public interface TaskMapper {
 
     @Select("select top 1 w.assignTaskDate, w.userSolutionId from WorkFlowTask w where taskId = #{taskId} order by id desc")
     public TaskForDoneDTO getTaskForDone(String taskId);
+
+    @Select("update Task set status = #{status} where id = #{taskId}")
+    public void updateTaskInSubmit(String status, String taskId);
+
+    @Select("select top 1 t.id as txtTaskId, t.name as txtTaskName, i.assignTaskDate as txtAssignDate, t.startDate as txtStartDate,\n" +
+            " t.endDate as txtEndDate, i.status, i.createdFeedbackDate, i.feedback, i.rate from Task t left join \n" +
+            "(select w.id, w.taskId, w.assignTaskDate, w.status, w.createdFeedbackDate, w.feedback, w.rate from WorkFlowTask w where w.userSolutionId = #{userId}) i on t.id = i.taskId where t.id = #{taskId} order by i.id desc")
+    public CurrentTaskIsReopenDTO loadTaskByIdReopen(int taskId, String userId);
 }

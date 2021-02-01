@@ -2,13 +2,10 @@ package com.android.prm.service.authentication;
 
 import com.android.prm.service.accountdto.UserInfoAdminDTO;
 import com.android.prm.service.controller.UserController;
-import com.android.prm.service.mapper.UserMapper;
 import com.android.prm.service.model.request.AccountRequest;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;

@@ -1,8 +1,6 @@
 package com.android.prm.service.mapper;
 
-import com.android.prm.service.accountdto.EmployeeDTO;
-import com.android.prm.service.accountdto.GroupDTO;
-import com.android.prm.service.accountdto.GroupUserDTO;
+import com.android.prm.service.accountdto.*;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
@@ -27,9 +25,24 @@ public interface GroupMapper {
             "right join (select * from GroupDetail where id = #{taskId}) b on a.groupId = b.id) x on r.id = x.roleId")
     public List<GroupUserDTO> getCurrentUserInGroup(String taskId);
 
-    @Select("select id, username, name, phone, email, roleId from Account where groupId IS NULL and roleId != 1")
+    @Select("select id, username, name, phone, email, roleId from Account where roleId IS NULL")
     public List<EmployeeDTO> getAvailableEmployee();
 
-    @Update("Update Account set groupId = #{groupId} where id = #{userId}")
-    public void addAvailableEmployeeToGroup(String groupId, String userId);
+    @Update("Update Account set groupId = #{groupId}, roleId = #{roleId} where id = #{userId}")
+    public void addAvailableEmployeeToGroup(String groupId, String userId, String roleId);
+
+    @Select("select id as groupId, name from GroupDetail")
+    public List<GroupSpnDTO> getListCurrentGroup();
+
+    @Select("select id as roleId, description as roleName from Role where id != 1")
+    public List<RoleSpnDTO> getListCurrentRole();
+
+    @Select("select distinct roleId from Account where groupId = #{groupId} and roleId = 3")
+    public int isCurrentHasManger(String groupId);
+
+    @Update("update Account set roleId = 2 where id = #{managerId}")
+    public void deroleFromManagerToEmployee(String managerId);
+
+    @Update("update GroupDetail set managerId = #{managerId} where id = #{groupId}")
+    public void setNewManagerToGroup(String managerId, String groupId);
 }
